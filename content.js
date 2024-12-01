@@ -1,295 +1,1685 @@
-var doTags;
-var doCompleted;
+let settings = {};
+let sharedtypes = [];
+let sharedanime = [];
+let user = [];
+let animelist = [[], []];
+let animenodelist = [[], []];
+let animeId = [[], []];
+let mediaType;
+let settingsUnset = false;
+let hiddenCounter = 0;
+const bannedGenres = [];
+// let highlightedGenres = [];
 
-function setup() {
-  browser.storage.local.get(
-    ["tags", "completed", "malgraph"],
-    function (items) {
-      doTags = items["tags"];
-      doCompleted = items["completed"];
-      doMalGraph = items["malgraph"];
-      isAuthenticated();
-    }
-  );
+// Tags/affinities
+const tags = [
+	"All",
+	"Action",
+	"Adult Cast",
+	"Adventure",
+	"Anthropomorphic",
+	"Avant Garde",
+	"Award Winning",
+	"Boys Love",
+	"CGDCT",
+	"Childcare",
+	"Combat Sports",
+	"Comedy",
+	"Crossdressing",
+	"Delinquents",
+	"Detective",
+	"Drama",
+	"Ecchi",
+	"Educational",
+	"Erotica",
+	"Fantasy",
+	"Gag Humor",
+	"Girls Love",
+	"Gore",
+	"Gourmet",
+	"Harem",
+	"Hentai",
+	"High Stakes Game",
+	"Historical",
+	"Horror",
+	"Idols (Female)",
+	"Idols (Male)",
+	"Isekai",
+	"Iyashikei",
+	"Josei",
+	"Kids",
+	"Love Polygon",
+	"Magical Sex Shift",
+	"Mahou Shoujo",
+	"Martial Arts",
+	"Mecha",
+	"Medical",
+	"Memoir",
+	"Military",
+	"Music",
+	"Mystery",
+	"Mythology",
+	"Organized Crime",
+	"Otaku Culture",
+	"Parody",
+	"Performing Arts",
+	"Pets",
+	"Psychological",
+	"Racing",
+	"Reincarnation",
+	"Reverse Harem",
+	"Romance",
+	"Romantic Subtext",
+	"Samurai",
+	"School",
+	"Sci-Fi",
+	"Seinen",
+	"Shoujo",
+	"Shounen",
+	"Showbiz",
+	"Slice of Life",
+	"Space",
+	"Sports",
+	"Strategy Game",
+	"Super Power",
+	"Supernatural",
+	"Survival",
+	"Suspense",
+	"Team Sports",
+	"Time Travel",
+	"Vampire",
+	"Video Game",
+	"Villainess",
+	"Visual Arts",
+	"Workplace",
+	"Urban Fantasy",
+	"Love Status Quo",
+];
+let values = {};
+for (const tag of tags) {
+	values[tag] = {};
+	values[tag].total = 0;
+	values[tag].x = [];
+	values[tag].y = [];
+	values[tag].diff = [];
+	values[tag].totaldiff = 0;
+	values[tag].totalx = 0;
+	values[tag].totaly = 0;
+	values[tag].meanx = 0;
+	values[tag].meany = 0;
+	values[tag].meandiff = 0;
+	values[tag].affinity = 0;
 }
 
-var content = document.getElementById("content");
-var divs = content.getElementsByTagName("h2");
-var tables = content.getElementsByTagName("table");
-var animes = [];
+let maltags;
+let malcompletedinplanned;
+let malplus;
+let mallogin;
+let droptag;
+let sortcip;
+let highlighter;
+let highlighted;
+let banMediaTypes;
+let affinitysetting;
+let cutoffsetting;
+let completedorder;
 
-var user1 = divs[0].getElementsByTagName("a")[2];
-var user2 = divs[0].getElementsByTagName("a")[1];
-//browser.runtime.sendMessage(message);
+let content = document.getElementById("content");
+let table = document.createElement("TABLE");
+table.cellpadding = "0";
+table.width = "100%";
+table.cellspacing = "0";
+table.border = 0;
+
+let goToTop = document.createElement("tr");
+goToTop.innerHTML = `<td colspan="4" class="borderClass" style="border-width: 0;"><a href="#">Top</a></td>`;
+
+const setup = () => {
+	user = [
+		document
+			.getElementById("content")
+			.getElementsByTagName("h2")[0]
+			.getElementsByTagName("a")[2].text,
+		document
+			.getElementById("content")
+			.getElementsByTagName("h2")[0]
+			.getElementsByTagName("a")[1].text,
+	];
+
+	if (window.location.href.includes("manga")) {
+		mediaType = "manga";
+	} else {
+		mediaType = "anime";
+	}
+
+	tempAffinity();
+
+	let flip = document.createElement("DIV");
+	let aflip = document.createElement("A");
+	aflip.text = "Flip users";
+	aflip.href = `/shared.php?u1=${user[0]}&u2=${user[1]}${
+		mediaType == "manga" ? "&type=manga" : ""
+	}`;
+	flip.appendChild(aflip);
+
+	flip.style.display = "inline-block";
+	content.insertBefore(flip, content.childNodes[1]);
+
+	browser.storage.local.get(
+		[
+			"tags",
+			"completed",
+			"completedorder",
+			"malgraph",
+			"malexlogin",
+			"droptag",
+			"sortcip",
+			"highlighter",
+			"highlighted",
+			"music",
+			"pv",
+			"cm",
+			"affinity",
+			"cutoff",
+		],
+		function (settingsdata) {
+			maltags = settingsdata["tags"];
+			malcompletedinplanned = settingsdata["completed"];
+			completedorder = settingsdata["completedorder"];
+			malplus = settingsdata["malgraph"];
+			mallogin = settingsdata["malexlogin"];
+			droptag = settingsdata["droptag"];
+			sortcip = settingsdata["sortcip"];
+			highlighter = settingsdata["highlighter"];
+			highlighted = settingsdata["highlighted"];
+			banMediaTypes = [
+				settingsdata["music"] ? "music" : "",
+				settingsdata["pv"] ? "pv" : "",
+				settingsdata["cm"] ? "cm" : "",
+			];
+			affinitysetting = settingsdata["affinity"];
+			cutoffsetting = settingsdata["cutoff"];
+
+			if (typeof cutoffsetting === "undefined" || isNaN(cutoffsetting)) {
+				cutoffsetting = 5;
+			}
+
+			let Run = true;
+
+			if (maltags === undefined) maltags = false;
+
+			if (malcompletedinplanned === undefined) malcompletedinplanned = false;
+
+			if (completedorder === undefined) completedorder = false;
+
+			if (malplus === undefined) malplus = false;
+
+			if (mallogin === undefined) mallogin = false;
+
+			if (droptag === undefined) droptag = false;
+
+			if (sortcip === undefined) sortcip = false;
+
+			if (highlighter === undefined) highlighter = false;
+
+			if (highlighted === undefined) highlighted = [];
+
+			if (
+				maltags == false &&
+				malcompletedinplanned == false &&
+				malplus == false &&
+				mallogin == false
+			) {
+				settingsUnset = true;
+				Run = false;
+				notifyUserUnset();
+			} else if (
+				maltags == false &&
+				malcompletedinplanned == false &&
+				malplus == true
+			) {
+				Run = false;
+				postDraw();
+			}
+
+			console.log(settingsdata);
+
+			if (mediaType == "anime") {
+				settings = {
+					logging: false,
+					sharedtypes: ["completed", "on_hold", "dropped", "watching"],
+				};
+			} else {
+				settings = {
+					logging: false,
+					sharedtypes: ["completed", "on_hold", "dropped", "reading"],
+				};
+			}
+
+			console.time("All");
+			if (Run) {
+				if (mallogin == false) {
+					drawModBar();
+					let message = {
+						command: "getUserData",
+						u0: user[0],
+						u1: user[1],
+						sharedtypes: settings.sharedtypes,
+						auth_type: mallogin,
+					};
+
+					sendMessage(message, (userData) => {
+						animelist = userData.animelist;
+						animenodelist = userData.animenodelist;
+						animeId = userData.animeId;
+						// clearPage();
+						drawTables(userData);
+					});
+				} else {
+					sendMessage({ command: "auth_check" }, (response) => {
+						if (response.message == "authorized") {
+							drawModBar();
+
+							let message = {
+								command: "getUserData",
+								u0: user[0],
+								u1: user[1],
+								sharedtypes: settings.sharedtypes,
+								auth_type: mallogin,
+							};
+							sendMessage(message, (userData) => {
+								animelist = userData.animelist;
+								animenodelist = userData.animenodelist;
+								animeId = userData.animeId;
+								// clearPage();
+								drawTables(userData);
+							});
+						} else {
+							pleaseAuth();
+						}
+					});
+				}
+			}
+		}
+	);
+};
 
 setup();
 
-browser.runtime.onMessage.addListener(gotMessage);
+function notifyUserUnset() {
+	let modBar = document.createElement("div");
+	modBar.style =
+		"display: flex; flex-direction: column; border: 1px solid #fff; border-radius: 4px; padding:0 0rem; align-items: flex-end;";
 
-function isAuthenticated() {
-  var message = {
-    message: "isAuthenticated",
-  };
-  browser.runtime.sendMessage(message);
+	let modText = document.createElement("div");
 
-  if (doCompleted === true) {
-    setCompletedFrame();
-  }
+	// modText.style =
+	//   "cursor: pointer; padding:4px 4px; font-family: Avenir,lucida grande,tahoma,verdana,arial,sans-serif; text-decoration: none; color:white;border-radius: 2px; font-size:14px;font-weight: 700;text-align: center;margin-left: 8px; background:#2e51a2;";
+	modText.innerHTML = "Please set your add-on settings";
+	modBar.appendChild(modText);
+	content.insertBefore(modBar, content.childNodes[2]);
 }
 
-function sendNames(user1, user2) {
-  if (user1.text.length > 0) {
-    var message = {
-      user_1: user1.text,
-      user_2: user2.text,
-    };
-    browser.runtime.sendMessage(message);
-  }
+function pleaseAuth() {
+	let modBar = document.createElement("div");
+	modBar.style =
+		"display: flex; flex-direction: column; border: 1px solid #fff; border-radius: 4px; padding:0 0rem; align-items: flex-end;";
+
+	let modText = document.createElement("div");
+	modText.className = "authButton";
+	modText.style =
+		"cursor: pointer; padding:4px 4px; font-family: Avenir,lucida grande,tahoma,verdana,arial,sans-serif; text-decoration: none; color:white;border-radius: 2px; font-size:14px;font-weight: 700;text-align: center;margin-left: 8px; background:#2e51a2;";
+	modText.innerHTML = "Log in to add-on";
+
+	modBar.appendChild(modText);
+
+	content.insertBefore(modBar, content.childNodes[2]);
+	const Button = document.querySelector(".authButton");
+
+	Button.addEventListener("click", (e) => {
+		e.preventDefault();
+		var message = {
+			command: "login",
+		};
+		sendMessage(message, () => {
+			location.reload();
+		});
+	});
 }
 
-function loadGeneres(media, tableID) {
-  var message = {
-    message: "animeGenre",
-    anime: media.toString(),
-    table: tableID,
-  };
-  browser.runtime.sendMessage(message);
+function postDraw() {
+	// let flip = document.createElement("DIV");
+	// let aflip = document.createElement("A");
+	// aflip.text = "Flip users";
+	// aflip.href = `/shared.php?u1=${user[1]}&u2=${user[0]}${
+	//   mediaType == "manga" ? "&type=manga" : ""
+	// }`;
+	// flip.appendChild(aflip);
+
+	// flip.style.display = "inline-block";
+	// content.insertBefore(flip, content.childNodes[1]);
+	let modBar = content.childNodes[2];
+	modBar.remove();
+	if (malplus) {
+		var row3 = document.createElement("DIV");
+		var m1 = document.createElement("DIV");
+		var m1t = document.createElement("A");
+		m1t.text = `${user[0]}'s MalGraph`;
+		m1t.href = `https://anime.plus/${user[0]}?referral=search`;
+		m1.appendChild(m1t);
+		row3.appendChild(m1);
+
+		let p = document.createTextNode(" | ");
+		m1.appendChild(p);
+
+		var m2t = document.createElement("A");
+		m2t.text = `${user[1]}'s MalGraph`;
+		m2t.href = `https://anime.plus/${user[1]}?referral=search`;
+		m1.appendChild(m2t);
+		row3.appendChild(m1);
+
+		row3.classList.add("spaceit");
+		content.insertBefore(row3, content.childNodes[1]);
+
+		let row4 = document.createElement("DIV");
+		let statsDiv = document.createElement("DIV");
+		let statsLink1 = document.createElement("A");
+		statsLink1.text = `${user[0]}'s Statistics`;
+		statsLink1.href = `https://myanimelist.net/profile/${user[0]}/statistics`;
+		statsDiv.appendChild(statsLink1);
+		row4.appendChild(statsDiv);
+
+		let p2 = document.createTextNode(" | ");
+		statsDiv.appendChild(p2);
+
+		let statsLink2 = document.createElement("A");
+		statsLink2.text = `${user[1]}'s Statistics`;
+		statsLink2.href = `https://myanimelist.net/profile/${user[1]}/statistics`;
+		statsDiv.appendChild(statsLink2);
+		row4.appendChild(statsDiv);
+
+		row4.classList.add("spaceit");
+		content.insertBefore(row4, content.childNodes[1]);
+	}
 }
 
-function sendGenres() {
-  let con = 0;
+function drawUnique(uniqueData) {
+	let header = document.createElement("h2");
+	let quicklink = document.createElement("a");
+	header.innerHTML = `Unique to <a href="/profile/${user[0]}">${user[0]}</a>`;
+	content.appendChild(document.createElement("br"));
+	quicklink.setAttribute("name", "u1");
+	quicklink.name = "u1";
+	content.appendChild(quicklink);
 
-  for (i = 0; i < tables.length; i++) {
-    table = tables[i].rows;
+	content.appendChild(header);
 
-    for (let row of table) {
-      if (con != 0) {
-        let element = row.getElementsByClassName("borderClass")[0];
-        try {
-          loadGeneres(element.innerHTML.slice(16, 22).split("/")[0], i);
-        } catch (error) {
-          console.error(error);
-        }
-      } else {
-        con += 1;
-      }
-    }
-  }
+	let table = document.createElement("TABLE");
+	table.cellpadding = "0";
+	table.width = "100%";
+	table.cellspacing = "0";
+	table.border = 0;
+	content.appendChild(quicklink);
+
+	let header2 = document.createElement("tr");
+	header2.innerHTML = `
+  <td class="borderClass"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=1"><strong>Title</strong></a></td>
+  <td class="borderClass" width="140" align="center"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=2"><strong>${user[0]}'s Score</strong></a></td>
+`;
+	table.appendChild(header2);
+	content.appendChild(quicklink);
+
+	for (let anime of uniqueData[0]) {
+		let doTagsExist;
+		if (
+			typeof animelist[0][animeId[0].indexOf(anime)].node.genres === "undefined"
+		) {
+			doTagsExist = false;
+		} else {
+			doTagsExist = true;
+		}
+		try {
+			let tbody = document.createElement("TBODY");
+			let tr = document.createElement("TR");
+			let title = animelist[0][animeId[0].indexOf(anime)].node.title;
+			let score = animelist[0][animeId[0].indexOf(anime)].list_status.score;
+			if (score == 0) score = "-";
+			tr.innerHTML = `<tr>
+    <td class="borderClass"><a href="/${mediaType}/${anime}">${title}</a> <a href="https://myanimelist.net/ownlist/${mediaType}/add?selected_series_id=${
+				anime.id
+			}&amp;hideLayout=1" title="Quick add ${mediaType} to my list" class="Lightbox_AddEdit button_add">add</a><span class="genres">${
+				maltags
+					? doTagsExist
+						? animelist[0][animeId[0].indexOf(anime)].node.genres
+								.map((gn) => gn.name)
+								.join(" | ")
+						: ""
+					: ""
+			}</span></td>
+    <td class="borderClass" align="center"><span style="">${score}</span></td>
+  </tr>`;
+
+			tbody.appendChild(tr);
+			table.appendChild(tbody);
+		} catch (e) {}
+	}
+
+	content.appendChild(table);
+
+	header = document.createElement("h2");
+	let quicklink2 = document.createElement("a");
+	header.innerHTML = `Unique to <a href="/profile/${user[1]}">${user[1]}</a>`;
+	content.appendChild(document.createElement("br"));
+	quicklink2.setAttribute("name", "u2");
+
+	content.appendChild(quicklink2);
+	content.appendChild(header);
+
+	table = document.createElement("TABLE");
+	table.cellpadding = "0";
+	table.width = "100%";
+	table.cellspacing = "0";
+	table.border = 0;
+
+	header2 = document.createElement("tr");
+	header2.innerHTML = `
+  <td class="borderClass"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=1"><strong>Title</strong></a></td>
+  <td class="borderClass" width="140" align="center"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=2"><strong>${user[1]}'s Score</strong></a></td>
+`;
+	table.appendChild(header2);
+
+	for (let anime of uniqueData[1]) {
+		let doTagsExist;
+		if (
+			typeof animelist[1][animeId[1].indexOf(anime)].node.genres === "undefined"
+		) {
+			doTagsExist = false;
+		} else {
+			doTagsExist = true;
+		}
+		try {
+			let tbody = document.createElement("TBODY");
+			let tr = document.createElement("TR");
+			let title = animelist[1][animeId[1].indexOf(anime)].node.title;
+			let score = animelist[1][animeId[1].indexOf(anime)].list_status.score;
+			if (score == 0) score = "-";
+			tr.innerHTML = `<tr>
+    <td class="borderClass"><a href="/${mediaType}/${anime}">${title}</a> <a href="https://myanimelist.net/ownlist/${mediaType}/add?selected_series_id=${
+				anime.id
+			}&amp;hideLayout=1" title="Quick add ${mediaType} to my list" class="Lightbox_AddEdit button_add">add</a><span class="genres">${
+				maltags
+					? doTagsExist
+						? animelist[1][animeId[1].indexOf(anime)].node.genres
+								.map((gn) => gn.name)
+								.join(" | ")
+						: ""
+					: ""
+			}</span></td>
+    <td class="borderClass" align="center"><span style="">${score}</span></td>
+  </tr>`;
+
+			tbody.appendChild(tr);
+			table.appendChild(tbody);
+		} catch (e) {}
+	}
+
+	content.appendChild(table);
 }
 
-var celll1;
-var roww;
+function drawCompletedInPlanned(animeData) {
+	let a = 9;
+	let header = document.createElement("h2");
+	if (completedorder == false)
+		header.innerHTML = `Completed by <a href="/profile/${user[1]}">${user[1]}</a>, planned by <a href="/profile/${user[0]}">${user[0]}</a>`;
+	else if (completedorder == true)
+		header.innerHTML = `Completed by <a href="/profile/${user[0]}">${user[0]}</a>, planned by <a href="/profile/${user[1]}">${user[1]}</a>`;
+	content.insertBefore(document.createElement("br"), content.childNodes[a]);
+	content.insertBefore(document.createElement("a"), content.childNodes[a + 1]);
+	content.insertBefore(header, content.childNodes[a + 2]);
 
-function setCompletedFrame() {
-  var title = document.createElement("H2");
-  var textnode = document.createTextNode(
-    "Completed by " + user1.text + ", planned by " + user2.text
-  );
-  title.appendChild(textnode);
-  content.insertBefore(title, content.childNodes[9]);
+	let table = document.createElement("TABLE");
+	table.cellpadding = "0";
+	table.width = "100%";
+	table.cellspacing = "0";
+	table.border = 0;
 
-  var table = document.createElement("TABLE");
-  table.border = "0";
-  table.cellPadding = "0";
-  table.cellSpacing = "0";
-  table.width = "100%";
-  var row_1 = table.insertRow(0);
-  var cell_1 = row_1.insertCell(0);
-  var cell_2 = row_1.insertCell(1);
-  var celCon1 = document.createElement("STRONG");
-  var celCon2 = document.createElement("STRONG");
-  celCon1.innerHTML = "Title";
-  celCon2.innerHTML = user1.text + "'s Score";
-  cell_1.classList.add("borderClass");
-  cell_2.classList.add("borderClass");
-  cell_2.style.textAlign = "center";
-  cell_2.width = "140";
-  cell_1.appendChild(celCon1);
-  cell_2.appendChild(celCon2);
-  content.insertBefore(table, content.childNodes[10]);
+	let header2 = document.createElement("tr");
+	if (completedorder == false)
+		header2.innerHTML = `
+		<td class="borderClass"><a href="?u1=${user[1]}&amp;u2=${user[0]}&amp;type=${mediaType}&amp;o=1"><strong>Title</strong></a></td>
+		<td class="borderClass" width="140" align="center"><a href="?u1=${user[1]}&amp;u2=${user[0]}&amp;type=${mediaType}&amp;o=2"><strong>${user[1]}'s Score</strong></a></td>
+		`;
+	else if (completedorder == true)
+		header2.innerHTML = `
+		<td class="borderClass"><a href="?u1=${user[1]}&amp;u2=${user[0]}&amp;type=${mediaType}&amp;o=1"><strong>Title</strong></a></td>
+		<td class="borderClass" width="140" align="center"><a href="?u1=${user[1]}&amp;u2=${user[0]}&amp;type=${mediaType}&amp;o=2"><strong>${user[0]}'s Score</strong></a></td>
+		`;
+	table.appendChild(header2);
 
-  roww = tables[1].insertRow(-1);
-  celll1 = roww.insertCell(0);
+	let tbody = document.createElement("TBODY");
+	// Step 1: Collect the anime data into an array
+	let animeList = [];
+	for (let anime of animeData) {
+		let tempGenres = [];
+		for (let genre of animelist[1][animeId[1].indexOf(anime)].node.genres)
+			tempGenres.push(genre.name);
+		if (tempGenres.some((genre) => bannedGenres.includes(genre))) {
+			hiddenCounter += 1;
+			continue;
+		}
+		let theanimelist;
+		let theanimeId;
+		if (completedorder == false) {
+			theanimelist = animelist[1];
+			theanimeId = animeId[1];
+		} else if (completedorder == true) {
+			theanimelist = animelist[0];
+			theanimeId = animeId[0];
+		}
+		let title = animelist[1][animeId[1].indexOf(anime)].node.title;
+		let score = theanimelist[theanimeId.indexOf(anime)].list_status.score;
+		let year =
+			animelist[1][animeId[1].indexOf(anime)].node.start_date.split("-")[0];
+		let num_episodes = "-";
+		try {
+			if (mediaType == "anime") {
+				num_episodes =
+					animelist[1][animeId[1].indexOf(anime)].node.num_episodes + " eps";
+			} else if (mediaType == "manga") {
+				num_episodes =
+					animelist[1][animeId[1].indexOf(anime)].node.num_volumes + " vols";
+			}
+		} catch (e) {}
+		let media_type = animelist[1][
+			animeId[1].indexOf(anime)
+		].node.media_type.replace(/_/g, " ");
+
+		let doTagsExist;
+		if (
+			typeof animelist[1][animeId[1].indexOf(anime)].node.genres === "undefined"
+		) {
+			doTagsExist = false;
+		} else {
+			doTagsExist = true;
+		}
+		if (score == 0) score = "-";
+
+		animeList.push({
+			anime,
+			title,
+			score,
+			year,
+			num_episodes,
+			media_type,
+			doTagsExist,
+			genres: animelist[1][animeId[1].indexOf(anime)].node.genres,
+		});
+	}
+	// Step 2: Sort the array by score
+	animeList.sort((a, b) => b.score - a.score);
+
+	for (let animeData of animeList) {
+		let tr = document.createElement("TR");
+		tr.innerHTML = `<tr>
+    <td class="borderClass"><a href="/${mediaType}/${animeData.anime}">${
+			animeData.title
+		}</a> <a href="https://myanimelist.net/ownlist/${mediaType}/add?selected_series_id=${
+			animeData.anime.id
+		}&amp;hideLayout=1" title="Quick add ${mediaType} to my list" class="Lightbox_AddEdit button_add">add</a><span class="year" style="margin: 0 5px">(${
+			animeData.year
+		}, ${animeData.num_episodes}, ${
+			animeData.media_type
+		})</span>  <span class="genres">${
+			maltags
+				? animeData.doTagsExist
+					? animeData.genres.map((gn) => gn.name).join(" | ")
+					: ""
+				: ""
+		}</span></td>
+    <td class="borderClass" align="center"><span style="">${
+			animeData.score
+		}</span></td>
+  </tr>`;
+		tbody.appendChild(tr);
+	}
+
+	table.appendChild(tbody);
+	table.appendChild(goToTop);
+	content.insertBefore(table, content.childNodes[a + 3]);
+
+	postDraw();
 }
 
-function setAuthentication(row2) {
-  var buttonDiv = document.createElement("DIV");
-  var button = document.createElement("BUTTON");
-  button.innerHTML = "AUTHENTICATE";
-  button.type = "submit";
-  button.style.cssText =
-    "background-color:#2e51a2;border-radius:0.25em;color:#ffffff;font-weight:bold;text-decoration:none;font-family:'Roboto',sans-serif;border: none;padding:0.3em 1.2em;margin:0 0.3em 0.3em 0;text-align:center;transition: all 2s;";
-  buttonDiv.appendChild(button);
-  buttonDiv.style.display = "inline-block";
-  buttonDiv.style.float = "right";
+function drawShared(sharedData) {
+	let tbody = document.createElement("TBODY");
+	let tr = document.createElement("TR");
+	tr.innerHTML = `
+    <td class="borderClass"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=1"><strong>Title</strong></a></td>
+    <td class="borderClass" width="140" align="center"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=2"><strong>${user[0]}'s Score</strong></a></td>
+    <td class="borderClass" width="140" align="center"><a href="?u1=${user[0]}&amp;u2=${user[1]}&amp;type=${mediaType}&amp;o=3"><strong>${user[1]}'s Score</strong></a></td>
+    <td class="borderClass" width="50" align="center"><span title="Score Difference"><strong>Diff.</strong></span></td>
+    `;
+	let topRow = document.createElement("H2");
+	let topText = `<div class="floatRightHeader">
+    <a href="/shared.php?u1=${user[0]}&amp;u2=${user[1]}&amp;type=manga"
+      >Shared Manga</a
+    >
+  </div>
+  Shared ${mediaType} Between <a href="/profile/${user[0]}">${user[0]}</a> and
+  <a href="/profile/${user[1]}">${user[1]}</a>`;
+	topRow.innerHTML = topText;
+	content.insertBefore(topRow, content.childNodes[1]);
 
-  row2.appendChild(buttonDiv);
+	tbody.appendChild(tr);
+	table.appendChild(tbody);
+	content.appendChild(table);
 
-  row2.classList.add("spaceit");
+	tbody = document.createElement("TBODY");
+	for (let anime of sharedData) {
+		if (anime.u0 == 0) anime.u0 = "-";
+		if (anime.u1 == 0) anime.u1 = "-";
+		let doTagsExist;
+		if (
+			typeof animelist[1][animeId[1].indexOf(anime)].node.genres === "undefined"
+		) {
+			doTagsExist = false;
+		} else {
+			doTagsExist = true;
+		}
 
-  content.insertBefore(row2, content.childNodes[1]);
-  var empty = document.createElement("DIV");
-  var emptyP = document.createElement("P");
-  emptyP.innerHTML = " ⠀";
-  empty.appendChild(emptyP);
-  row2.appendChild(empty);
-  row2.classList.add("spaceit");
-  content.insertBefore(row2, content.childNodes[1]);
+		let tr = document.createElement("TR");
+
+		tr.innerHTML = `
+  <td class="borderClass"><a href="/${mediaType}/${anime.id}">${
+			anime.title + " "
+		}</a><span class="genres">${
+			maltags
+				? doTagsExist
+					? animelist[0][animeId[0].indexOf(anime.id)].node.genres
+							.map((gn) => gn.name)
+							.join(" | ")
+					: ""
+				: ""
+		}</span></td>
+  <td class="borderClass" align="center"><span style=" color: ${
+		anime.u0 > anime.u1 ? "#FF0000" : "#0000FF"
+	};">${anime.u0}</span></td>
+  <td class="borderClass" align="center"><span style=" color: ${
+		anime.u0 < anime.u1 ? "#FF0000" : "#0000FF"
+	};">${anime.u1}</span></td>
+  <td class="borderClass" align="center">${
+		anime.u0 == "-" || anime.u1 == "-" ? "-" : Math.abs(anime.u0 - anime.u1)
+	}</td>
+  `;
+		tbody.appendChild(tr);
+	}
+	table.appendChild(tbody);
+
+	content.appendChild(table);
 }
 
-function setFlip(row2) {
-  var flip = document.createElement("DIV");
-  var aflip = document.createElement("A");
-  aflip.text = "Flip users";
-  aflip.href = "/shared.php?u1=" + user1.text + "&u2=" + user2.text;
-  flip.appendChild(aflip);
-
-  flip.style.display = "inline-block";
-  row2.appendChild(flip);
-  content.insertBefore(row2, content.childNodes[1]);
+function getGenre(anime, i) {
+	try {
+		if (i == 0)
+			return animelist[0][animeId[0].indexOf(Number(anime))].node.genres;
+		if (i == 1 && malcompletedinplanned == false)
+			return animelist[0][animeId[0].indexOf(Number(anime))].node.genres;
+		if (i == 2 && malcompletedinplanned == false)
+			return animelist[1][animeId[1].indexOf(Number(anime))].node.genres;
+		if (i == 2 && malcompletedinplanned == true)
+			return animelist[1][animeId[1].indexOf(Number(anime))].node.genres; // it was [0] and [0]
+		if (i == 3 && malcompletedinplanned == true)
+			return animelist[0][animeId[0].indexOf(Number(anime))].node.genres; // it was [1] and [1]
+	} catch (e) {}
 }
 
-function setCompletedAuthRequired() {
-  celll1.innerHTML = "Authenication required";
-  celll1.style.textAlign = "center";
+function getStatus(anime, i) {
+	try {
+		if (i == 0)
+			return animelist[0][animeId[0].indexOf(Number(anime))].list_status.status;
+		if (i == 1 && malcompletedinplanned == false)
+			return animelist[0][animeId[0].indexOf(Number(anime))].list_status.status;
+		if (i == 2 && malcompletedinplanned == false)
+			return animelist[1][animeId[1].indexOf(Number(anime))].list_status.status;
+		if (i == 2 && malcompletedinplanned == true)
+			return animelist[1][animeId[1].indexOf(Number(anime))].list_status.status; // it was [0] and [0]
+		if (i == 3 && malcompletedinplanned == true)
+			return animelist[0][animeId[0].indexOf(Number(anime))].list_status.status; // it was [1] and [1]
+	} catch (e) {}
 }
 
-function setCompletedAuthNotRequired() {
-  celll1.innerHTML = "Loading...";
-  celll1.style.textAlign = "center";
+function getStartDate(anime, i) {
+	try {
+		if (i == 0)
+			return animelist[0][
+				animeId[0].indexOf(Number(anime))
+			].node.start_date.split("-")[0];
+		if (i == 1 && malcompletedinplanned == false)
+			return animelist[0][
+				animeId[0].indexOf(Number(anime))
+			].node.start_date.split("-")[0];
+		if (i == 2 && malcompletedinplanned == false)
+			return animelist[1][
+				animeId[1].indexOf(Number(anime))
+			].node.start_date.split("-")[0];
+		if (i == 2 && malcompletedinplanned == true)
+			return animelist[1][
+				animeId[1].indexOf(Number(anime))
+			].node.start_date.split("-")[0]; // it was [0] and [0]
+		if (i == 3 && malcompletedinplanned == true)
+			return animelist[0][
+				animeId[0].indexOf(Number(anime))
+			].node.start_date.split("-")[0]; // it was [1] and [1]
+	} catch (e) {}
 }
 
-function setMalGraph() {
-  var row3 = document.createElement("DIV");
-  var m1 = document.createElement("DIV");
-  var m1t = document.createElement("A");
-  m1t.text = `${user1.text}'s MalGraph`;
-  m1t.href = `https://anime.plus/${user1.text}?referral=search`;
-  m1.appendChild(m1t);
-  row3.appendChild(m1);
-
-  let p = document.createTextNode(" | ");
-  m1.appendChild(p);
-
-  var m2t = document.createElement("A");
-  m2t.text = `${user2.text}'s MalGraph`;
-  m2t.href = `https://anime.plus/${user2.text}?referral=search`;
-  m1.appendChild(m2t);
-  row3.appendChild(m1);
-
-  row3.classList.add("spaceit");
-  content.insertBefore(row3, content.childNodes[1]);
+function getNumEpisodes(anime, i) {
+	try {
+		if (mediaType == "manga") {
+			if (i == 0)
+				return animelist[0][animeId[0].indexOf(Number(anime))].node.num_volumes;
+			if (i == 1 && malcompletedinplanned == false)
+				return animelist[0][animeId[0].indexOf(Number(anime))].node.num_volumes;
+			if (i == 2 && malcompletedinplanned == false)
+				return animelist[1][animeId[1].indexOf(Number(anime))].node.num_volumes;
+			if (i == 2 && malcompletedinplanned == true)
+				return animelist[1][animeId[1].indexOf(Number(anime))].node.num_volumes; // it was [0] and [0]
+			if (i == 3 && malcompletedinplanned == true)
+				return animelist[0][animeId[0].indexOf(Number(anime))].node.num_volumes; // it was [1] and [1]
+		} else if (mediaType == "anime") {
+			if (i == 0)
+				return animelist[0][animeId[0].indexOf(Number(anime))].node
+					.num_episodes;
+			if (i == 1 && malcompletedinplanned == false)
+				return animelist[0][animeId[0].indexOf(Number(anime))].node
+					.num_episodes;
+			if (i == 2 && malcompletedinplanned == false)
+				return animelist[1][animeId[1].indexOf(Number(anime))].node
+					.num_episodes;
+			if (i == 2 && malcompletedinplanned == true)
+				return animelist[1][animeId[1].indexOf(Number(anime))].node
+					.num_episodes; // it was [0] and [0]
+			if (i == 3 && malcompletedinplanned == true)
+				return animelist[0][animeId[0].indexOf(Number(anime))].node
+					.num_episodes; // it was [1] and [1]
+		}
+	} catch (e) {}
 }
 
-function gotMessage(message, sender, sendResponse) {
-  if (message == "auth_required") {
-    var row2 = document.createElement("DIV");
-    setAuthentication(row2);
-    setFlip(row2);
-    if (doCompleted === true) {
-      setCompletedAuthRequired();
-    }
-
-    if (doMalGraph === true) {
-      setMalGraph();
-    }
-
-    const Button = document.querySelector("button");
-
-    Button.addEventListener("click", () => {
-      var message = {
-        message: "login",
-      };
-      browser.runtime.sendMessage(message);
-    });
-  } else if (message == "auth_not_required") {
-    var row2 = document.createElement("DIV");
-    setFlip(row2);
-    if (doCompleted === true) {
-      setCompletedAuthNotRequired();
-      sendNames(user1, user2);
-    } else {
-      if (doTags === true) {
-        sendGenres();
-      }
-    }
-
-    if (doMalGraph === true) {
-      setMalGraph();
-    }
-  } else if (message == "authenticated") {
-    location.reload();
-  } else if (message == "end") {
-    animes.sort(function (x, y) {
-      return y.score - x.score;
-    });
-    roww.parentNode.removeChild(roww);
-    for (let anime of animes) {
-      var row = tables[1].insertRow(-1);
-      var cell1 = row.insertCell(0);
-      var cell2 = row.insertCell(1);
-      if (window.location.href.slice(-5) != "manga") {
-        cell1.innerHTML =
-          '<a href="/anime/' +
-          anime.id +
-          '/">' +
-          anime.name +
-          "</a>" +
-          '<a href="https://myanimelist.net/ownlist/anime/add?selected_series_id=' +
-          anime.id +
-          '&amp;hideLayout=1" title="Quick add anime to my list" class="Lightbox_AddEdit button_add">add</a>';
-      } else {
-        cell1.innerHTML =
-          '<a href="/manga/' +
-          anime.id +
-          '/">' +
-          anime.name +
-          "</a>" +
-          '<a href="https://myanimelist.net/ownlist/manga/add?selected_series_id=' +
-          anime.id +
-          '&amp;hideLayout=1" title="Quick add manga to my list" class="Lightbox_AddEdit button_add">add</a>';
-      }
-      cell2.innerHTML = anime.score;
-      cell1.classList.add("borderClass");
-      cell2.classList.add("borderClass");
-      cell2.style.textAlign = "center";
-    }
-    var row = tables[1].insertRow(-1);
-    var cell1 = row.insertCell(0);
-    cell1.innerHTML = '<a href="#">Top</a>';
-    cell1.classList.add("borderClass");
-    cell1.style.cssText = "border-width: 0";
-
-    row = tables[1].insertRow(-1);
-    cell1 = row.insertCell(0);
-    cell1.innerHTML = '<a href="#">Top</a>';
-    cell1.classList.add("spaceit_pad");
-    cell1.style.textAlign = "center";
-
-    if (doTags === true) {
-      sendGenres();
-    }
-  } else if (message == "array=0") {
-    var row = tables[1].insertRow(1);
-    var cell1 = row.insertCell(0);
-    cell1.innerHTML = "No entries";
-    cell1.style.textAlign = "center";
-  } else if (message.message == "genre") {
-    let con = 0;
-    table = tables[message.table].rows;
-    for (let row of table) {
-      if (con != 0) {
-        let element = row.getElementsByClassName("borderClass")[0];
-        let anime = element.innerHTML.slice(16, 22).split("/")[0];
-        if (anime == message.anime) {
-          element.innerHTML += message.genres.slice(0, -2);
-        }
-      } else {
-        con += 1;
-      }
-    }
-  } else {
-    var anime = { id: message[0], name: message[1], score: message[2] };
-    animes.push(anime);
-  }
+function getMediaType(anime, i) {
+	try {
+		if (i == 0)
+			return animelist[0][animeId[0].indexOf(Number(anime))].node.media_type;
+		if (i == 1 && malcompletedinplanned == false)
+			return animelist[0][animeId[0].indexOf(Number(anime))].node.media_type;
+		if (i == 2 && malcompletedinplanned == false)
+			return animelist[1][animeId[1].indexOf(Number(anime))].node.media_type;
+		if (i == 2 && malcompletedinplanned == true)
+			return animelist[1][animeId[1].indexOf(Number(anime))].node.media_type; // it was [0] and [0]
+		if (i == 3 && malcompletedinplanned == true)
+			return animelist[0][animeId[0].indexOf(Number(anime))].node.media_type; // it was [1] and [1]
+	} catch (e) {}
 }
+
+function drawTables(userData) {
+	if (malcompletedinplanned) {
+		message = {
+			command: "getCompletedInPlanned",
+			anime: userData.anime,
+			animeId: userData.animeId,
+			animelist: userData.animelist,
+			animenodelist: userData.animenodelist,
+			completedorder: completedorder,
+		};
+
+		sendMessage(message, (cipData) => {
+			drawCompletedInPlanned(cipData.cipanime); // TODO // todo what? // still no idea
+			if (maltags) {
+				let tables = content.getElementsByTagName("table");
+				for (let i in tables) {
+					let con = 0;
+					table = tables[i].rows;
+
+					if (i == 1 && malcompletedinplanned == true) {
+						continue; //
+					}
+
+					// Add genres and start date for shared and unique tables
+					if (table) {
+						for (let row of table) {
+							if (con != 0) {
+								let element = row.getElementsByClassName("borderClass")[0];
+
+								// Show the statrus of the anime on list (if dropped or on hold)
+								if (droptag) {
+									let statusSpan = document.createElement("span");
+									statusSpan.className = "status";
+									element.appendChild(statusSpan);
+
+									if (row.childNodes.length <= 5) {
+										let status = getStatus(
+											element.innerHTML.slice(16, 22).split("/")[0],
+											i
+										);
+										if (status == "dropped") {
+											statusSpan.style.display = "inline-block";
+											statusSpan.style.width = "10px"; // Adjust size of the dot
+											statusSpan.style.height = "10px";
+											statusSpan.style.backgroundColor = "red";
+											statusSpan.style.borderRadius = "50%"; // Makes it circular
+											statusSpan.style.marginLeft = "5px"; // Optional, adds spacing
+										}
+										if (status == "on_hold") {
+											statusSpan.style.display = "inline-block";
+											statusSpan.style.width = "10px"; // Adjust size of the dot
+											statusSpan.style.height = "10px";
+											statusSpan.style.backgroundColor = "orange";
+											statusSpan.style.borderRadius = "50%"; // Makes it circular
+											statusSpan.style.marginLeft = "5px"; // Optional, adds spacing (r) Chatptg
+										}
+									}
+								}
+
+								let year = document.createElement("span");
+								year.className = "year";
+								let span = document.createElement("span");
+								span.className = "genres";
+								try {
+									let attributes = ["("];
+									// Add start date after the anime name
+									let start_date = getStartDate(
+										element.innerHTML.slice(16, 22).split("/")[0],
+										i
+									);
+									if (start_date) attributes.push(start_date);
+
+									let num_episodes = getNumEpisodes(
+										element.innerHTML.slice(16, 22).split("/")[0],
+										i
+									);
+									if (mediaType == "manga" && num_episodes)
+										attributes.push(", ", num_episodes, " vols");
+									else if (mediaType == "anime" && num_episodes)
+										attributes.push(", ", num_episodes, " eps");
+
+									let media_type = getMediaType(
+										element.innerHTML.slice(16, 22).split("/")[0],
+										i
+									);
+									if (media_type)
+										attributes.push(", ", media_type.replace(/_/g, " "));
+
+									attributes.push(")");
+
+									year.innerHTML = attributes.join("");
+									year.style.margin = "0 5px";
+									element.appendChild(year);
+
+									// Add the genres after the anime name
+									let gens = getGenre(
+										element.innerHTML.slice(16, 22).split("/")[0],
+										i
+									);
+
+									if (gens) {
+										for (let gen of gens) {
+											span.innerHTML = span.innerHTML + gen.name + " | ";
+											// element.innerHTML = element.innerHTML + gen.name + " | ";
+										}
+										span.innerHTML = span.innerHTML.slice(0, -2);
+										element.appendChild(span);
+										// element.innerHTML = element.innerHTML.slice(0, -2);
+									}
+								} catch (error) {
+									console.error(error);
+								}
+							} else {
+								con += 1;
+							}
+						}
+					}
+				}
+			}
+			console.timeEnd("All");
+
+			//affinities start \/
+			const rows =
+				document.getElementsByTagName("table")[0].children[0].children;
+
+			for (let i = 1; i < rows.length - 2; ++i) {
+				let text = rows[i].innerText;
+				if (text.startsWith("\n\t\t\t")) continue;
+				let newtext = text.split(/\s*(add|edit)\s*/);
+				let brandnewtext = text.split(
+					/^(.+ (add|edit))(\((\d+)?,? ?(\d+ \w+)?\))?(.+)/
+				);
+				let arr = brandnewtext[6].split("\t");
+
+				let genres = [];
+				try {
+					genres = rows[i].querySelector(".genres").innerHTML.split(" | ");
+				} catch (e) {}
+				genres.push("All");
+				const x = Number.parseInt(arr[1]);
+				const y = Number.parseInt(arr[2]);
+				const diff = Number.parseInt(arr[3]);
+
+				try {
+					for (const genre of genres) {
+						let tag = values[genre.trim()];
+						tag.total += 1;
+						if (arr[3] === "\u00a0") continue;
+						tag.x.push(x);
+						tag.y.push(y);
+						tag.diff.push(diff);
+						tag.totalx += x;
+						tag.totaly += y;
+						tag.totaldiff += diff;
+					}
+				} catch (e) {
+					console.log(e);
+				}
+			}
+			let div = document.createElement("div");
+			for (let value in values) {
+				let tag = values[value];
+				let len = tag.x.length;
+				tag.meanx = tag.totalx / len;
+				tag.meany = tag.totaly / len;
+				tag.meandiff = tag.totaldiff / len;
+				let meansum = 0;
+				let varx = 0;
+				let vary = 0;
+				for (let i = 0; i < len; ++i) {
+					meansum += (tag.x[i] - tag.meanx) * (tag.y[i] - tag.meany);
+					varx += (tag.x[i] - tag.meanx) * (tag.x[i] - tag.meanx);
+					vary += (tag.y[i] - tag.meany) * (tag.y[i] - tag.meany);
+				}
+				tag.affinity = meansum / Math.sqrt(varx * vary);
+			}
+
+			for (let value in values) {
+				let tag = values[value];
+				let len = tag.x.length;
+				if (value == "All" || tag.total < Number.parseInt(cutoffsetting))
+					continue;
+				let para = document.createElement("p");
+				let text = document.createTextNode(
+					`${value} - Entries: ${tag.total} (${tag.x.length}) | Affinity: ${
+						isNaN(tag.affinity) ? "Unknown" : (tag.affinity * 100).toFixed(1)
+					}% | Mean Diff: ${tag.meandiff.toFixed(2)}`
+				);
+
+				para.appendChild(text);
+				div.append(para);
+			}
+			if (affinitysetting) {
+				let contentDiv = document.createElement("div");
+				contentDiv.id = "content";
+				contentDiv.prepend(div);
+
+				document
+					.getElementsByClassName("spaceit")[0]
+					.parentElement.prepend(contentDiv);
+			} else {
+				// main div
+				let expandableDiv = document.createElement("div");
+				expandableDiv.id = "expandableDiv";
+
+				// toggle button
+				let toggleButton = document.createElement("button");
+				toggleButton.id = "toggleButton";
+				toggleButton.innerHTML = "Show tag affinity &#9654;";
+				toggleButton.style.cursor = "pointer";
+				toggleButton.style.border = "none";
+
+				let contentDiv = document.createElement("div");
+				contentDiv.id = "content";
+				contentDiv.prepend(div);
+
+				expandableDiv.appendChild(toggleButton);
+				expandableDiv.appendChild(contentDiv);
+
+				contentDiv.style.display = "none";
+
+				document
+					.getElementsByClassName("spaceit")[0]
+					.parentElement.prepend(expandableDiv);
+
+				toggleButton.addEventListener("click", function () {
+					if (contentDiv.style.display === "none") {
+						contentDiv.style.display = "block";
+					} else {
+						contentDiv.style.display = "none";
+					}
+				});
+			}
+
+			let tempAffinityToRemove = document.getElementById("tempAffinity");
+			tempAffinityToRemove
+				? tempAffinityToRemove.remove()
+				: console.log("Element not found");
+
+			let para = document.createElement("p");
+			let text = document.createTextNode(
+				`All - Entries: ${values["All"].total} (${
+					values["All"].x.length
+				}) | Affinity: ${
+					isNaN(values["All"].affinity)
+						? "Unknown"
+						: (values["All"].affinity * 100).toFixed(1)
+				}% | Mean Diff: ${values["All"].meandiff.toFixed(2)}`
+			);
+			para.style.fontSize = "12px";
+			para.style.fontWeight = "bold";
+			para.style.padding = "10px 0";
+			if (values["All"].affinity <= 0) para.style.color = "firebrick";
+			else if (values["All"].affinity >= 0.499) para.style.color = "green";
+			para.appendChild(text);
+			document.getElementsByClassName("spaceit")[0].parentElement.prepend(para);
+
+			//affinities end /\
+
+			// Ban genres function after the tables are drawn and affinities are calculated
+			banGenres();
+		});
+	} else postDraw();
+
+	// this thing below is something i did last year and don't remember what it was supposed to be
+	// let message = {
+	//   command: "getShared",
+	//   anime: userData.anime,
+	//   animeId: userData.animeId,
+	//   animelist: userData.animelist,
+	//   animenodelist: userData.animenodelist,
+	//   sharedtypes: settings.sharedtypes,
+	// };
+
+	// sendMessage(message, (sharedData) => {
+	//   sharedanime = sharedData.sharedanime;
+	//   drawShared(sharedData.sharedanime);
+	//   message = {
+	//     command: "getUnique",
+	//     anime: userData.anime,
+	//     animeId: userData.animeId,
+	//     animelist: userData.animelist,
+	//     animenodelist: userData.animenodelist,
+	//     sharedanime: sharedanime,
+	//   };
+
+	//   sendMessage(message, (uniqueData) => {
+	//     drawUnique(uniqueData.uniqueanime);
+	//     if (malcompletedinplanned) {
+	//       message = {
+	//         command: "getCompletedInPlanned",
+	//         anime: userData.anime,
+	//         animeId: userData.animeId,
+	//         animelist: userData.animelist,
+	//         animenodelist: userData.animenodelist,
+	//       };
+
+	//       sendMessage(message, (cipData) => {
+	//         drawCompletedInPlanned(cipData.cipanime); // TODO
+	//         console.timeEnd("All");
+	//       });
+	//     } else postDraw();
+	//   });
+	// });
+}
+
+function banGenres() {
+	console.time("Ban Media Types");
+	// Ban certain media types
+	const tables = content.querySelectorAll("table");
+	for (let table of tables) {
+		for (let row of Array.from(table.rows).slice(1)) {
+			if (row.cells[0].childNodes.length === 6) {
+				let mediaType;
+				try {
+					mediaType = row.cells[0].childNodes[4].innerText
+						.split(", ")
+						.pop()
+						.split(")")[0];
+				} catch (error) {
+					// console.error("Error extracting mediaType:", error);
+					mediaType = null; // or any default value you prefer
+				}
+				if (banMediaTypes.includes(mediaType)) {
+					row.style.display = "none";
+					hiddenCounter += 1;
+				}
+			} else if (row.cells[0].childNodes.length === 5) {
+				let mediaType;
+				try {
+					mediaType = row.cells[0].childNodes[4].innerText
+						.split(", ")
+						.pop()
+						.split(")")[0];
+				} catch (error) {
+					// console.error("Error extracting mediaType:", error);
+					mediaType = null; // or any default value you prefer
+				}
+				if (banMediaTypes.includes(mediaType)) {
+					row.style.display = "none";
+					hiddenCounter += 1;
+				}
+			}
+		}
+	}
+	console.timeEnd("Ban Media Types");
+
+	console.time("Ban Genres");
+	// Ban some genres - integrate this into one above if banned genres become a thing
+	if (bannedGenres && bannedGenres.length > 0) {
+		const tables = content.querySelectorAll("table");
+		for (let table of tables) {
+			for (let row of Array.from(table.rows).slice(1)) {
+				if (row.cells[0].childNodes.length === 6) {
+					let genreNames = row.cells[0].childNodes[5].innerText.split(" | ");
+					if (genreNames.some((genre) => bannedGenres.includes(genre))) {
+						row.style.display = "none";
+						hiddenCounter += 1;
+					}
+				} else if (row.cells[0].childNodes.length === 5) {
+					let genreNames = row.cells[0].childNodes[4].innerText.split(" | ");
+					if (genreNames.some((genre) => bannedGenres.includes(genre))) {
+						row.style.display = "none";
+						hiddenCounter += 1;
+					}
+				}
+			}
+		}
+	}
+	console.timeEnd("Ban Genres");
+	console.log("Hidden: " + hiddenCounter);
+
+	highlightGenres();
+}
+
+function highlightGenres() {
+	console.time("Highlight Genres");
+	if (highlighter) {
+		if (highlighted && highlighted.length > 0) {
+			const colors = [
+				"DeepSkyBlue",
+				"IndianRed",
+				"Chartreuse",
+				"MediumOrchid",
+				"orange",
+				"HotPink",
+			];
+			const tables = content.querySelectorAll("table");
+			for (let table of tables) {
+				for (let row of Array.from(table.rows).slice(1)) {
+					let genreNode;
+					if (row.cells[0].childNodes.length === 6) {
+						genreNode = row.cells[0].childNodes[5];
+					} else if (row.cells[0].childNodes.length === 5) {
+						genreNode = row.cells[0].childNodes[4];
+					}
+
+					if (genreNode) {
+						let genreNames = genreNode.innerText.split(" | ");
+						let highlightedHTML = genreNames
+							.map((genre) => {
+								let lowerCaseGenre = genre.toLowerCase();
+								let index = highlighted.findIndex(
+									(highlight) => highlight.toLowerCase() === lowerCaseGenre
+								);
+								if (index !== -1) {
+									let color = colors[index % colors.length];
+									return `<span style="color: ${color};">${genre}</span>`;
+								} else {
+									return genre;
+								}
+							})
+							.join(" | ");
+						genreNode.innerHTML = highlightedHTML;
+					}
+				}
+			}
+		}
+		createFloatingCircle();
+	}
+	console.timeEnd("Highlight Genres");
+}
+
+function createFloatingCircle() {
+	let floatingCircle = document.createElement("div");
+	floatingCircle.id = "floatingCircle";
+	floatingCircle.style = `
+        width: 50px;
+        height: 50px;
+        background-color: #2e51a2;
+        border-radius: 50%;
+        position: fixed;
+        top: 100px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+		cursor: pointer;
+    `;
+
+	let brushIcon = document.createElement("div");
+	brushIcon.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" width="24" height="24">
+            <path fill="white" d="M339.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L568.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S517.7-4.4 499.1 9.6L262.4 187.2c-24 18-38.2 46.1-38.4 76.1L339.3 367.1zm-19.6 25.4l-116-104.4C143.9 290.3 96 339.6 96 400c0 3.9 .2 7.8 .6 11.6C98.4 429.1 86.4 448 68.8 448L64 448c-17.7 0-32 14.3-32 32s14.3 32 32 32l144 0c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/>
+        </svg>
+    `;
+
+	floatingCircle.appendChild(brushIcon);
+	document.body.appendChild(floatingCircle);
+
+	// Create the popup element
+	let popup = document.createElement("div");
+	popup.id = "popup";
+	popup.style = `
+        position: fixed;
+        top: 150px;
+        right: 10px;
+        width: 200px;
+        padding: 10px;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: none;
+        z-index: 1001;
+    `;
+	// Add title to the popup
+	let title = document.createElement("div");
+	title.innerText = "Genre Highlighter";
+	title.style = `
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 10px;
+		color: black;
+    `;
+	// Add input field to the popup
+	let inputField = document.createElement("input");
+	inputField.type = "text";
+	inputField.placeholder = "Enter gnres to highlight";
+	inputField.value = highlighted.join(", ");
+	inputField.style = `
+        width: 90%;
+        padding: 5px;
+        margin-top: 10px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+    `;
+
+	// Add event listener to update highlightedGenres
+	inputField.addEventListener("input", () => {
+		highlighted = inputField.value.split(",").map((genre) => genre.trim());
+		browser.storage.local.get(["highlighted"], function (items) {
+			console.log(items);
+			if (typeof items["highlighted"] === "undefined") {
+				items["highlighted"] = [];
+			}
+			items["highlighted"] = [...highlighted];
+			browser.storage.local.set(
+				{ highlighted: items["highlighted"] },
+				function () {
+					console.log(items["highlighted"]);
+				}
+			);
+		});
+	});
+
+	popup.appendChild(title);
+	popup.appendChild(inputField);
+	document.body.appendChild(popup);
+
+	// Add click event listener to the floating circle
+	floatingCircle.addEventListener("click", () => {
+		popup.style.display = popup.style.display === "none" ? "block" : "none";
+	});
+}
+
+function clearPage() {
+	let len = content.childNodes.length;
+	for (i = 0; i < len - 1; i++) {
+		content.childNodes[1].remove();
+	}
+}
+
+function drawModBar() {
+	let modBar = document.createElement("div");
+	modBar.style =
+		"display: flex; border: 1px solid #fff; border-radius: 4px; padding:0 2rem";
+
+	let spinner = document.createElement("img");
+	spinner.src = browser.runtime.getURL("walk.gif");
+	spinner.style = "height: 3rem";
+
+	let modText = document.createElement("h3");
+	modText.style = "padding-left:2rem;";
+	modText.innerHTML = message[Math.round(Math.random() * 234)];
+
+	modBar.appendChild(spinner);
+	modBar.appendChild(modText);
+
+	content.insertBefore(modBar, content.childNodes[2]);
+}
+
+function tempAffinity() {
+	const rows = document.getElementsByTagName("table")[0].children[0].children;
+	let allAffinity = {};
+	allAffinity.total = 0;
+	allAffinity.x = [];
+	allAffinity.y = [];
+	allAffinity.diff = [];
+	allAffinity.totaldiff = 0;
+	allAffinity.totalx = 0;
+	allAffinity.totaly = 0;
+	allAffinity.meanx = 0;
+	allAffinity.meany = 0;
+	allAffinity.meandiff = 0;
+	allAffinity.affinity = 0;
+	for (let i = 1; i < rows.length - 2; ++i) {
+		let text = rows[i].innerText;
+		let newtext = text.split(/\s*(add|edit)\s*/);
+		let brandnewtext = text.split(
+			/^(.+ (add|edit))(\((\d+)?,? ?(\d+ \w+)?\))?(.+)/
+		);
+		let arr = brandnewtext[6].split("\t");
+
+		const x = Number.parseInt(arr[1]);
+		const y = Number.parseInt(arr[2]);
+		const diff = Number.parseInt(arr[3]);
+
+		try {
+			allAffinity.total += 1;
+			if (arr[3] === "\u00a0") continue;
+			allAffinity.x.push(x);
+			allAffinity.y.push(y);
+			allAffinity.diff.push(diff);
+			allAffinity.totalx += x;
+			allAffinity.totaly += y;
+			allAffinity.totaldiff += diff;
+		} catch (e) {
+			console.log(e);
+		}
+	}
+	let len = allAffinity.x.length;
+	allAffinity.meanx = allAffinity.totalx / len;
+	allAffinity.meany = allAffinity.totaly / len;
+	allAffinity.meandiff = allAffinity.totaldiff / len;
+	let meansum = 0;
+	let varx = 0;
+	let vary = 0;
+	for (let i = 0; i < len; ++i) {
+		meansum +=
+			(allAffinity.x[i] - allAffinity.meanx) *
+			(allAffinity.y[i] - allAffinity.meany);
+		varx +=
+			(allAffinity.x[i] - allAffinity.meanx) *
+			(allAffinity.x[i] - allAffinity.meanx);
+		vary +=
+			(allAffinity.y[i] - allAffinity.meany) *
+			(allAffinity.y[i] - allAffinity.meany);
+	}
+	allAffinity.affinity = meansum / Math.sqrt(varx * vary);
+	let para = document.createElement("p");
+	let text = document.createTextNode(
+		`All - Entries: ${allAffinity.total} (${
+			allAffinity.x.length
+		}) | Affinity: ${
+			isNaN(allAffinity.affinity)
+				? "Unknown"
+				: (allAffinity.affinity * 100).toFixed(1)
+		}% | Mean Diff: ${allAffinity.meandiff.toFixed(2)}`
+	);
+	para.style.fontSize = "12px";
+	para.style.fontWeight = "bold";
+	para.style.padding = "10px 0";
+	para.id = "tempAffinity";
+	if (allAffinity.affinity <= 0) para.style.color = "firebrick";
+	else if (allAffinity.affinity >= 0.499) para.style.color = "green";
+	para.appendChild(text);
+	document.getElementsByClassName("spaceit")[0].parentElement.prepend(para);
+}
+
+let sendMessage = function (message, callback) {
+	browser.runtime.sendMessage(message, callback);
+};
+let message = [
+	"Generating witty dialog...",
+	"Swapping time and space...",
+	"Spinning violently around the y-axis...",
+	"Tokenizing real life...",
+	"Bending the spoon...",
+	"Filtering morale...",
+	"Don't think of purple hippos...",
+	"We need a new fuse...",
+	"Have a good day.",
+	"Upgrading Windows, your PC will restart several times. Sit back and relax.",
+	"The architects are still drafting",
+	"The bits are breeding",
+	"We're building the buildings as fast as we can",
+	"Would you prefer chicken, steak, or tofu?",
+	"(Pay no attention to the man behind the curtain)",
+	"...and enjoy the elevator music...",
+	"Please wait while the little elves draw your map",
+	"Don't worry - a few bits tried to escape, but we caught them",
+	"Would you like fries with that?",
+	"Checking the gravitational constant in your locale...",
+	"Go ahead -- hold your breath!",
+	"...at least you're not on hold...",
+	"Hum something loud while others stare",
+	"You're not in Kansas any more",
+	"The server is powered by a lemon and two electrodes.",
+	"We're testing your patience",
+	"As if you had any other choice",
+	"Follow the white rabbit",
+	"Why don't you order a sandwich?",
+	"While the satellite moves into position",
+	"The bits are flowing slowly today",
+	"Dig on the 'X' for buried treasure... ARRR!",
+	"The last time I tried this the monkey didn't survive. Let's hope it works better this time.",
+	"My other loading screen is much faster.",
+	"Testing on Timmy... We're going to need another Timmy.",
+	"(Insert quarter)",
+	"Are we there yet?",
+	"Have you lost weight?",
+	"Just count to 10",
+	"Why so serious?",
+	"Counting backwards from Infinity",
+	"Don't panic...",
+	"Do not run! We are your friends!",
+	"Do you come here often?",
+	"Warning: Don't set yourself on fire.",
+	"We're making you a cookie.",
+	"Creating time-loop inversion field",
+	"Spinning the wheel of fortune...",
+	"Loading the enchanted bunny...",
+	"Computing chance of success",
+	"I'm sorry Dave, I can't do that.",
+	"Looking for exact change",
+	"All your web browser are belong to us",
+	"All I really need is a kilobit.",
+	"I feel like im supposed to be loading something. . .",
+	"What do you call 8 Hobbits? A Hobbyte.",
+	"Should have used a compiled language...",
+	"Is this Windows?",
+	"Adjusting flux capacitor...",
+	"Please wait until the sloth starts moving.",
+	"Don't break your screen yet!",
+	"I swear it's almost done.",
+	"Let's take a mindfulness minute...",
+	"Unicorns are at the end of this road, I promise.",
+	"Listening for the sound of one hand clapping...",
+	"Keeping all the 1's and removing all the 0's...",
+	"Putting the icing on the cake. The cake is not a lie...",
+	"Cleaning off the cobwebs...",
+	"Making sure all the i's have dots...",
+	"We need more dilithium crystals",
+	"Where did all the internets go",
+	"Connecting Neurotoxin Storage Tank...",
+	"Granting wishes...",
+	"Time flies when you’re having fun.",
+	"Get some coffee and come back in ten minutes..",
+	"Spinning the hamster…",
+	"99 bottles of beer on the wall..",
+	"Stay awhile and listen..",
+	"Be careful not to step in the git-gui",
+	"You edhall not pass! yet..",
+	"Load it and they will come",
+	"Convincing AI not to turn evil..",
+	"There is no spoon. Because we are not done loading it",
+	"Your left thumb points to the right and your right thumb points to the left.",
+	"How did you get here?",
+	"Wait, do you smell something burning?",
+	"Computing the secret to life, the universe, and everything.",
+	"When nothing is going right, go left!!...",
+	"I love my job only when I'm on vacation...",
+	"i'm not lazy, I'm just relaxed!!",
+	"Never steal. The government hates competition....",
+	"Why are they called apartments if they are all stuck together?",
+	"Life is Short – Talk Fast!!!!",
+	"Optimism – is a lack of information.....",
+	"Save water and shower together",
+	"Whenever I find the key to success, someone changes the lock.",
+	"Sometimes I think war is God’s way of teaching us geography.",
+	"I’ve got problem for your solution…..",
+	"Where there’s a will, there’s a relative.",
+	"User: the word computer professionals use when they mean !!idiot!!",
+	"Adults are just kids with money.",
+	"I think I am, therefore, I am. I think.",
+	"A kiss is like a fight, with mouths.",
+	"You don’t pay taxes—they take taxes.",
+	"Coffee, Chocolate, Men. The richer the better!",
+	"I am free of all prejudices. I hate everyone equally.",
+	"git happens",
+	"May the forks be with you",
+	"A commit a day keeps the mobs away",
+	"This is not a joke, it's a commit.",
+	"Constructing additional pylons...",
+	"Roping some seaturtles...",
+	"Locating Jebediah Kerman...",
+	"We are not liable for any broken screens as a result of waiting.",
+	"Hello IT, have you tried turning it off and on again?",
+	"If you type Google into Google you can break the internet",
+	"Well, this is embarrassing.",
+	"What is the airspeed velocity of an unladen swallow?",
+	"Hello, IT... Have you tried forcing an unexpected reboot?",
+	"They just toss us away like yesterday's jam.",
+	"They're fairly regular, the beatings, yes. I'd say we're on a bi-weekly beating.",
+	"The Elders of the Internet would never stand for it.",
+	"Space is invisible mind dust, and stars are but wishes.",
+	"Didn't know paint dried so quickly.",
+	"Everything sounds the same",
+	"I'm going to walk the dog",
+	"I didn't choose the engineering life. The engineering life chose me.",
+	"Dividing by zero...",
+	"Spawn more Overlord!",
+	"If I’m not back in five minutes, just wait longer.",
+	"Some days, you just can’t get rid of a bug!",
+	"We’re going to need a bigger boat.",
+	"Chuck Norris never git push. The repo pulls before.",
+	"Web developers do it with <style>",
+	"I need to git pull --my-life-together",
+	"Java developers never RIP. They just get Garbage Collected.",
+	"Cracking military-grade encryption...",
+	"Simulating traveling salesman...",
+	"Proving P=NP...",
+	"Entangling superstrings...",
+	"Twiddling thumbs...",
+	"Searching for plot device...",
+	"Trying to sort in O(n)...",
+	"Laughing at your pictures-i mean, loading...",
+	"Sending data to NS-i mean, our servers.",
+	"Looking for sense of humour, please hold on.",
+	"Please wait while the intern refills his coffee.",
+	"A different error message? Finally, some progress!",
+	"Hold on while we wrap up our git together...sorry",
+	"Please hold on as we reheat our coffee",
+	"Kindly hold on as we convert this bug to a feature...",
+	"Kindly hold on as our intern quits vim...",
+	"Winter is coming...",
+	"Installing dependencies",
+	"Switching to the latest JS framework...",
+	"Distracted by cat gifs",
+	"Finding someone to hold my beer",
+	"BRB, working on my side project",
+	"@todo Insert witty loading message",
+	"Let's hope it's worth the wait",
+	"Aw, snap! Not..",
+	"Ordering 1s and 0s...",
+	"Updating dependencies...",
+	"Whatever you do, don't look behind you...",
+	"Please wait... Consulting the manual...",
+	"It is dark. You're likely to be eaten by a grue.",
+	"Loading funny message...",
+	"It's 10:00pm. Do you know where your children are?",
+	"Waiting Daenerys say all her titles...",
+	"Feel free to spin in your chair",
+	"What the what?",
+	"format C: ...",
+	"Forget you saw that password I just typed into the IM ...",
+	"What's under there?",
+	"Your computer has a virus, its name is Windows!",
+	"Go ahead, hold your breath and do an ironman plank till loading complete",
+	"Bored of slow loading spinner, buy more RAM!",
+	"Help, I'm trapped in a loader!",
+	"What is the difference btwn a hippo and a zippo? One is really heavy, the other is a little lighter",
+	"Please wait, while we purge the Decepticons for you. Yes, You can thanks us later!",
+	"Chuck Norris once urinated in a semi truck's gas tank as a joke....that truck is now known as Optimus Prime.",
+	"Chuck Norris doesn’t wear a watch. HE decides what time it is.",
+	"Mining some bitcoins...",
+	"Downloading more RAM..",
+	"Updating to Windows Vista...",
+	"Deleting System32 folder",
+	"Hiding all ;'s in your code",
+	"Alt-F4 speeds things up.",
+	"Initializing the initializer...",
+	"When was the last time you dusted around here?",
+	"Optimizing the optimizer...",
+	"Last call for the data bus! All aboard!",
+	"Running swag sticker detection...",
+	"Never let a computer know you're in a hurry.",
+	"A computer will do what you tell it to do, but that may be much different from what you had in mind.",
+	"Some things man was never meant to know. For everything else, there's Google.",
+	"Unix is user-friendly. It's just very selective about who its friends are.",
+	"Shovelling coal into the server",
+	"Pushing pixels...",
+	"How about this weather, eh?",
+	"Building a wall...",
+	"Everything in this universe is either a potato or not a potato",
+	"The severity of your issue is always lower than you expected.",
+	"Updating Updater...",
+	"Downloading Downloader...",
+	"Debugging Debugger...",
+	"Reading Terms and Conditions for you.",
+	"Digested cookies being baked again.",
+	"Live long and prosper.",
+	"There is no cow level, but there's a goat one!",
+	"Deleting all your hidden porn...",
+	"Running with scissors...",
+	"Definitely not a virus...",
+	"You may call me Steve.",
+	"You seem like a nice person...",
+	"Coffee at my place, tommorow at 10A.M. - don't be late!",
+	"Work, work...",
+	"Patience! This is difficult, you know...",
+	"Discovering new ways of making you wait...",
+	"Your time is very important to us. Please wait while we ignore you...",
+	"Time flies like an arrow; fruit flies like a banana",
+	"Two men walked into a bar; the third ducked...",
+	"Sooooo... Have you seen my vacation photos yet?",
+	"Sorry we are busy catching em' all, we're done soon",
+	"TODO: Insert elevator music",
+	"Still faster than Windows update",
+	"Composer hack: Waiting for reqs to be fetched is less frustrating if you add -vvv to your command.",
+	"Please wait while the minions do their work",
+	"Grabbing extra minions",
+	"Doing the heavy lifting",
+	"We're working very Hard .... Really",
+	"Waking up the minions",
+	"You are number 2843684714 in the queue",
+	"Please wait while we serve other customers...",
+	"Our premium plan is faster",
+	"Feeding unicorns...",
+];
