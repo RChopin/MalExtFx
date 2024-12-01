@@ -10,9 +10,6 @@ let auth_type;
 let auth_token;
 let mediaType;
 
-// const no_auth_token = "";
-// const CLIENT_ID = encodeURIComponent("");
-
 const MAL_URI_ENDPOINT = "https://myanimelist.net/v1/oauth2/authorize";
 const RESPONSE_TYPE = encodeURIComponent("code");
 
@@ -24,10 +21,6 @@ for (var i = 0; i < 128; i++) {
 }
 const CODE_CHALLENGE = encodeURIComponent(text);
 const STATE = encodeURIComponent("RequestID42");
-// let optionsPage = browser.runtime.getURL("options.html");
-// console.log(optionsPage);
-// const REDIRECT_URI = encodeURIComponent(optionsPage);
-// console.log(REDIRECT_URI);
 
 function create_auth_endpoint() {
 	let endpoint_url = `${MAL_URI_ENDPOINT}?response_type=${RESPONSE_TYPE}&client_id=${CLIENT_ID}&code_challenge=${CODE_CHALLENGE}&state=${STATE}`;
@@ -42,12 +35,6 @@ function authorize() {
 	return browser.windows.create(
 		{ url: endpoint_url } // optional object
 	);
-
-	// return browser.identity.launchWebAuthFlow({
-	// 	interactive: true,
-	// 	url: endpoint_url,
-	// 	redirect_uri: redirectURL,
-	// });
 }
 
 function validate(redirect_uri) {
@@ -67,10 +54,8 @@ function launchAuthFlow(sendResponse) {
 	var redirectURL = browser.identity.getRedirectURL();
 	console.log(redirectURL);
 	console.log(create_auth_endpoint());
-	// let endpoint_url = create_auth_endpoint();
 
 	return authorize().then(validate);
-	// return true;
 }
 
 async function getToken(code, sendResponse) {
@@ -104,16 +89,12 @@ async function getToken(code, sendResponse) {
 		});
 }
 
-// browser.runtime.onInstalled.addListener((installed) => {
-//   console.log(installed);
-// });
-
 browser.runtime.onInstalled.addListener((details) => {
 	if (details.reason === "install") {
 		// The extension has just been installed
 
-		const width = 350; // Adjust the width as needed
-		const height = 700; // Adjust the height as needed
+		const width = 350;
+		const height = 700;
 
 		browser.windows.create({
 			type: "popup",
