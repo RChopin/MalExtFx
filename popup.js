@@ -51,6 +51,13 @@ function setup() {
 		}
 		document.getElementById("highlighter").checked = items["highlighter"];
 	});
+	browser.storage.local.get(["bonker"], function (items) {
+		if (typeof items["bonker"] === "undefined") {
+			items["bonker"] = false;
+			browser.storage.local.set({ bonker: false }, () => {});
+		}
+		document.getElementById("bonker").checked = items["bonker"];
+	});
 	browser.storage.local.get(["music"], function (items) {
 		if (typeof items["music"] === "undefined") {
 			items["music"] = false;
@@ -165,6 +172,16 @@ checkbox8.addEventListener("change", (event) => {
 		browser.storage.local.set({ highlighter: true }, function () {});
 	} else {
 		browser.storage.local.set({ highlighter: false }, function () {});
+	}
+});
+
+const checkbox13 = document.getElementById("bonker");
+
+checkbox13.addEventListener("change", (event) => {
+	if (event.target.checked) {
+		browser.storage.local.set({ bonker: true }, function () {});
+	} else {
+		browser.storage.local.set({ bonker: false }, function () {});
 	}
 });
 
