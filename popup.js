@@ -58,27 +58,34 @@ function setup() {
 		}
 		document.getElementById("bonker").checked = items["bonker"];
 	});
-	browser.storage.local.get(["music"], function (items) {
-		if (typeof items["music"] === "undefined") {
-			items["music"] = false;
-			browser.storage.local.set({ music: false }, () => {});
+	browser.storage.local.get(["banMediaTypes"], function (items) {
+		if (typeof items["banMediaTypes"] === "undefined") {
+			items["banMediaTypes"] = [];
 		}
-		document.getElementById("music").checked = items["music"];
+		document.getElementById("inputBanMedia").value = items["banMediaTypes"];
+		console.log(items["banMediaTypes"]);
 	});
-	browser.storage.local.get(["pv"], function (items) {
-		if (typeof items["pv"] === "undefined") {
-			items["pv"] = false;
-			browser.storage.local.set({ pv: false }, () => {});
-		}
-		document.getElementById("pv").checked = items["pv"];
-	});
-	browser.storage.local.get(["cm"], function (items) {
-		if (typeof items["cm"] === "undefined") {
-			items["cm"] = false;
-			browser.storage.local.set({ cm: false }, () => {});
-		}
-		document.getElementById("cm").checked = items["cm"];
-	});
+	// browser.storage.local.get(["music"], function (items) {
+	// 	if (typeof items["music"] === "undefined") {
+	// 		items["music"] = false;
+	// 		browser.storage.local.set({ music: false }, () => {});
+	// 	}
+	// 	document.getElementById("music").checked = items["music"];
+	// });
+	// browser.storage.local.get(["pv"], function (items) {
+	// 	if (typeof items["pv"] === "undefined") {
+	// 		items["pv"] = false;
+	// 		browser.storage.local.set({ pv: false }, () => {});
+	// 	}
+	// 	document.getElementById("pv").checked = items["pv"];
+	// });
+	// browser.storage.local.get(["cm"], function (items) {
+	// 	if (typeof items["cm"] === "undefined") {
+	// 		items["cm"] = false;
+	// 		browser.storage.local.set({ cm: false }, () => {});
+	// 	}
+	// 	document.getElementById("cm").checked = items["cm"];
+	// });
 	browser.storage.local.get(["affinity"], function (items) {
 		document.getElementById("affinity").checked = items["affinity"];
 	});
@@ -185,35 +192,45 @@ checkbox13.addEventListener("change", (event) => {
 	}
 });
 
-const checkbox9 = document.getElementById("music");
+const inputBanMedia = document.getElementById("banMedia");
+let inputBanMediaButton = inputBanMedia.childNodes[3];
 
-checkbox9.addEventListener("change", (event) => {
-	if (event.target.checked) {
-		browser.storage.local.set({ music: true }, function () {});
-	} else {
-		browser.storage.local.set({ music: false }, function () {});
-	}
+inputBanMediaButton.addEventListener("click", (event) => {
+	event.preventDefault();
+	let inputValue = inputBanMedia.childNodes[1].value;
+	browser.storage.local.set({ banMediaTypes: inputValue }, function () {});
+	console.log(inputValue);
 });
 
-const checkbox10 = document.getElementById("pv");
+// const checkbox9 = document.getElementById("music");
 
-checkbox10.addEventListener("change", (event) => {
-	if (event.target.checked) {
-		browser.storage.local.set({ pv: true }, function () {});
-	} else {
-		browser.storage.local.set({ pv: false }, function () {});
-	}
-});
+// checkbox9.addEventListener("change", (event) => {
+// 	if (event.target.checked) {
+// 		browser.storage.local.set({ music: true }, function () {});
+// 	} else {
+// 		browser.storage.local.set({ music: false }, function () {});
+// 	}
+// });
 
-const checkbox11 = document.getElementById("cm");
+// const checkbox10 = document.getElementById("pv");
 
-checkbox11.addEventListener("change", (event) => {
-	if (event.target.checked) {
-		browser.storage.local.set({ cm: true }, function () {});
-	} else {
-		browser.storage.local.set({ cm: false }, function () {});
-	}
-});
+// checkbox10.addEventListener("change", (event) => {
+// 	if (event.target.checked) {
+// 		browser.storage.local.set({ pv: true }, function () {});
+// 	} else {
+// 		browser.storage.local.set({ pv: false }, function () {});
+// 	}
+// });
+
+// const checkbox11 = document.getElementById("cm");
+
+// checkbox11.addEventListener("change", (event) => {
+// 	if (event.target.checked) {
+// 		browser.storage.local.set({ cm: true }, function () {});
+// 	} else {
+// 		browser.storage.local.set({ cm: false }, function () {});
+// 	}
+// });
 
 const checkbox12 = document.getElementById("affinity");
 

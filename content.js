@@ -178,9 +178,10 @@ const setup = () => {
 			"highlighted",
 			"bonker",
 			"bannedGenres",
-			"music",
-			"pv",
-			"cm",
+			"banMediaTypes",
+			// "music",
+			// "pv",
+			// "cm",
 			"affinity",
 			"cutoff",
 		],
@@ -196,11 +197,17 @@ const setup = () => {
 			highlighted = settingsdata["highlighted"];
 			bonker = settingsdata["bonker"];
 			bannedGenres = settingsdata["bannedGenres"];
-			banMediaTypes = [
-				settingsdata["music"] ? "music" : "",
-				settingsdata["pv"] ? "pv" : "",
-				settingsdata["cm"] ? "cm" : "",
-			];
+			banMediaTypes =
+				settingsdata["banMediaTypes"] == "undefined"
+					? []
+					: settingsdata["banMediaTypes"]
+							.split(",")
+							.map((mediaType) => mediaType.trim());
+			// banMediaTypes = [
+			// 	settingsdata["music"] ? "music" : "",
+			// 	settingsdata["pv"] ? "pv" : "",
+			// 	settingsdata["cm"] ? "cm" : "",
+			// ];
 			affinitysetting = settingsdata["affinity"];
 			cutoffsetting = settingsdata["cutoff"];
 
@@ -231,6 +238,8 @@ const setup = () => {
 			if (bonker === undefined) bonker = false;
 
 			if (bannedGenres === undefined) bannedGenres = [];
+
+			if (banMediaTypes === undefined) banMediaTypes = [];
 
 			if (
 				maltags == false &&
@@ -531,6 +540,7 @@ function drawCompletedInPlanned(animeData) {
 	content.insertBefore(header, content.childNodes[a + 2]);
 
 	let table = document.createElement("TABLE");
+	table.className = "shared-table";
 	table.cellpadding = "0";
 	table.width = "100%";
 	table.cellspacing = "0";
@@ -571,8 +581,13 @@ function drawCompletedInPlanned(animeData) {
 		}
 		let title = animelist[1][animeId[1].indexOf(anime)].node.title;
 		let score = theanimelist[theanimeId.indexOf(anime)].list_status.score;
-		let year =
-			animelist[1][animeId[1].indexOf(anime)].node.start_date.split("-")[0];
+		let year;
+		try {
+			year =
+				animelist[1][animeId[1].indexOf(anime)].node.start_date.split("-")[0];
+		} catch (e) {
+			year = "-";
+		}
 		let num_episodes = "-";
 		try {
 			if (mediaType == "anime") {
@@ -1086,13 +1101,15 @@ function banGenres() {
 			if (row.cells[0].childNodes.length === 6) {
 				let mediaType;
 				try {
-					mediaType = row.cells[0].childNodes[4].innerText
-						.split(", ")
+					mediaType = row.cells[0]
+						.querySelector(".year")
+						.innerText.split(", ")
 						.pop()
 						.split(")")[0];
 				} catch (error) {
 					mediaType = null;
 				}
+				console.log(banMediaTypes);
 				if (banMediaTypes.includes(mediaType)) {
 					row.style.display = "none";
 					hiddenCounter += 1;
@@ -1100,8 +1117,9 @@ function banGenres() {
 			} else if (row.cells[0].childNodes.length === 5) {
 				let mediaType;
 				try {
-					mediaType = row.cells[0].childNodes[4].innerText
-						.split(", ")
+					mediaType = row.cells[0]
+						.querySelector(".year")
+						.innerText.split(", ")
 						.pop()
 						.split(")")[0];
 				} catch (error) {
